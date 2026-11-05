@@ -4,112 +4,91 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Onion Routing Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="player.css">
 </head>
 <body>
-    <header>
-        <h1>Onion Routing Lab</h1>
-        <p class="sub">Team 23, Distributed Systems. Browser version of the Python prototype: real AES-GCM layers and key exchange (WebCrypto), simulated network. Change a setting and hit Run.</p>
-    </header>
+    <!-- Sidebar : same knobs as the Streamlit dashboard -->
+    <aside id="sidebar">
+        <h2>Network settings</h2>
+        <div class="slider" data-id="hops" data-label="Hops in the circuit" data-min="1" data-max="5" data-value="3"></div>
+        <div class="slider" data-id="pool" data-label="Relays in the pool" data-min="3" data-max="10" data-value="5"></div>
+        <div class="slider" data-id="reqs" data-label="Requests to send" data-min="1" data-max="6" data-value="2"></div>
+        <div class="slider" data-id="delay" data-label="Delay per link (ms)" data-min="0" data-max="100" data-value="20"></div>
 
-    <div class="layout">
-        <!-- Controls -->
-        <aside>
-            <h2>Network settings</h2>
-            <label>Hops in the circuit <output id="hopsOut"></output>
-                <input type="range" id="hops" min="1" max="5" value="3"></label>
-            <label>Relays in the pool <output id="poolOut"></output>
-                <input type="range" id="pool" min="3" max="10" value="6"></label>
-            <label>Delay per link (ms) <output id="delayOut"></output>
-                <input type="range" id="delay" min="0" max="100" value="10"></label>
-            <label>Packet loss per relay (%) <output id="lossOut"></output>
-                <input type="range" id="loss" min="0" max="30" value="0"></label>
-            <label>Requests to send <output id="reqsOut"></output>
-                <input type="range" id="reqs" min="1" max="20" value="6"></label>
-            <label>Client timeout (ms) <output id="timeoutOut"></output>
-                <input type="range" id="timeout" min="100" max="2000" step="50" value="500"></label>
+        <!-- Advanced knobs, closed by default -->
+        <details class="expander">
+            <summary>Advanced settings</summary>
+            <div class="expander-body">
+                <div class="slider" data-id="loss" data-label="Packet loss per relay (%)" data-min="0" data-max="30" data-value="0"></div>
+                <div class="slider" data-id="timeout" data-label="Client timeout (ms)" data-min="100" data-max="2000" data-step="50" data-value="500"></div>
 
-            <h2>Failure injection</h2>
-            <label class="check"><input type="checkbox" id="killOn" checked> Crash a relay mid-run</label>
-            <label>...before request # <output id="killAtOut"></output>
-                <input type="range" id="killAt" min="0" max="5" value="2"></label>
-            <label>...which hop dies (1 = entry) <output id="killHopOut"></output>
-                <input type="range" id="killHop" min="1" max="3" value="2"></label>
-            <fieldset>
-                <legend>In-flight request policy</legend>
-                <label class="check"><input type="radio" name="policy" value="retry" checked> Retry once on a new circuit</label>
-                <label class="check"><input type="radio" name="policy" value="fail"> Fail with an error</label>
-            </fieldset>
-            <label class="check"><input type="checkbox" id="heartbeat"> Heartbeat (detect failure before next request)</label>
-
-            <p id="warn" class="warn" hidden>Pool is smaller than hops + 1, a failed relay cannot be replaced.</p>
-            <button id="run">Run</button>
-        </aside>
-
-        <!-- Results -->
-        <main>
-            <section class="metrics" id="metrics"></section>
-
-            <nav class="tabs" id="tabs">
-                <button data-tab="flow" class="active">Message flow</button>
-                <button data-tab="layers">Layered encryption</button>
-                <button data-tab="latency">Latency vs hops</button>
-                <button data-tab="fail">Failures</button>
-                <button data-tab="saw">What each hop saw</button>
-            </nav>
-
-            <!-- Tab: message flow -->
-            <section id="tab-flow" class="tab">
-                <p>Scrub through everything that happened, one log event at a time.</p>
-                <input type="range" id="step" min="0" max="0" value="0" class="wide">
-                <div class="two">
-                    <svg id="net" viewBox="0 0 800 440" role="img" aria-label="Network diagram"></svg>
-                    <div>
-                        <h3 id="stepTitle"></h3>
-                        <div class="info" id="stepText"></div>
-                        <div id="stepTable"></div>
-                    </div>
+                <p class="bold">Failure injection</p>
+                <label class="check"><input type="checkbox" id="killOn"> Crash a relay mid-run</label>
+                <label class="field">...before request #<select id="killAt"></select></label>
+                <label class="field">...which hop dies (1 = entry)<select id="killHop"></select></label>
+                <div class="field">In-flight request policy
+                    <label class="check"><input type="radio" name="policy" value="retry" checked> Retry once on a new circuit</label>
+                    <label class="check"><input type="radio" name="policy" value="fail"> Fail with an error</label>
                 </div>
-            </section>
+                <label class="check"><input type="checkbox" id="heartbeat"> Heartbeat (detect failure before next request)</label>
+            </div>
+        </details>
 
-            <!-- Tab: layers -->
-            <section id="tab-layers" class="tab" hidden>
-                <p>Follow the first request. The client wraps it once per hop; each relay peels exactly one layer. Every cell on the wire is padded to 1024 bytes in the Python version, so size does not give away the position.</p>
-                <h3>1. Client wraps the request (innermost layer first)</h3>
-                <div id="wrapTable"></div>
-                <h3>2. Each relay peels one layer</h3>
-                <div id="peelTable"></div>
-                <p class="note">The "after peeling" bytes of one hop are the "received" bytes of the next hop: the onion shrinks layer by layer.</p>
-            </section>
+        <div id="poolWarn" class="alert warning" hidden>Pool is smaller than hops + 1, a failed relay cannot be replaced.</div>
+        <button id="run" class="primary wide">Run</button>
+        <div id="stepCount"></div>
+    </aside>
 
-            <!-- Tab: latency -->
-            <section id="tab-latency" class="tab" hidden>
-                <p>Runs a fresh network for 1 to 5 hops using the current delay / loss settings (no crashes).</p>
-                <button id="sweep">Run latency sweep</button>
-                <div id="sweepOut"></div>
-            </section>
+    <!-- Main page -->
+    <main>
+        <h1>Onion Routing Lab</h1>
+        <p class="caption">Browser version of the Python lab: real key exchange and AES-GCM layers (WebCrypto), network simulated in your browser. Change a setting and hit Run.</p>
 
-            <!-- Tab: failures -->
-            <section id="tab-fail" class="tab" hidden>
-                <p>Latency of every request. Red = failed, orange = recovered by rebuilding the circuit.</p>
-                <div id="failChart"></div>
-                <div id="failTable"></div>
-                <h3>Failure timeline</h3>
-                <div id="failTimeline"></div>
-            </section>
+        <nav class="tabs" id="tabs">
+            <button data-tab="flow" class="active">Message flow</button>
+            <button data-tab="layers">Layered encryption</button>
+            <button data-tab="latency">Latency vs hops</button>
+            <button data-tab="fail">Failures</button>
+            <button data-tab="saw">What each hop saw</button>
+        </nav>
 
-            <!-- Tab: observability -->
-            <section id="tab-saw" class="tab" hidden>
-                <p id="circuitLine"></p>
-                <div id="sawTable"></div>
-                <h3>Anonymity claims checked against the logs</h3>
-                <div id="claims"></div>
-                <p class="note">Try 1 hop: the single relay sees everything, so claim 1 breaks. Still true for any length: a malicious entry and exit can match traffic by timing, the exit sees the plaintext request (no end-to-end TLS here), and a compromised directory could hand out only its own relays.</p>
-            </section>
-        </main>
-    </div>
+        <!-- Tab 1 : step through the log -->
+        <section id="tab-flow" class="tab">
+            <p>Press Run in the sidebar and watch it play, one log event at a time. Pause any time, drag the slider or step with the buttons.</p>
+            <div id="player"></div>
+        </section>
+
+        <!-- Tab 2 : what the layers look like -->
+        <section id="tab-layers" class="tab" hidden>
+            <p>Follow the first request. The client wraps it once per hop; each relay peels exactly one layer. Every cell on the wire is padded to 1024 bytes, so size does not give away the position.</p>
+            <div id="layersOut"></div>
+        </section>
+
+        <!-- Tab 3 : latency sweep -->
+        <section id="tab-latency" class="tab" hidden>
+            <p>Runs a fresh network for 1 to 5 hops using the current delay / loss settings (no crashes).</p>
+            <button id="sweep">Run latency sweep</button>
+            <div id="sweepOut"></div>
+        </section>
+
+        <!-- Tab 4 : failures -->
+        <section id="tab-fail" class="tab" hidden>
+            <p>Latency of every request in the main run. Red = failed, orange = recovered by rebuilding the circuit.</p>
+            <div id="failOut"></div>
+        </section>
+
+        <!-- Tab 5 : observability -->
+        <section id="tab-saw" class="tab" hidden>
+            <div id="sawOut"></div>
+        </section>
+    </main>
 
     <script src="sim.js"></script>
+    <script src="scene.js"></script>
+    <script src="player.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
