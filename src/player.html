@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- Streamlit wrapper around the shared player (site/scene.js + site/player.js + site/player.css are inlined here) -->
+<style>body { margin: 0; background: #0c0e16; }</style>
+<style>__CSS__</style>
+</head>
+<body>
+<div id="root"></div>
+<script>__SCENE__</script>
+<script>__PLAYER__</script>
+<script>
+// Events of the real run, already stripped of addresses by dashboard.py
+const EVENTS = __EVENTS__;
+const RELAYS = __RELAYS__;
+const HOPS = __HOPS__;
+window.player = mountPlayer(document.getElementById("root"), Scene.buildPlayerData(EVENTS, RELAYS, HOPS));
+
+// Ask the page to give this frame the height it needs (works when allowed, harmless otherwise)
+try {
+    if (window.frameElement) {
+        window.frameElement.style.height = (document.documentElement.scrollHeight + 4) + "px";
+    }
+} catch (err) {
+}
+</script>
+</body>
+</html>

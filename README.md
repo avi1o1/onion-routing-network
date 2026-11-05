@@ -13,6 +13,7 @@ A small Tor-style onion routing overlay for the Distributed Systems course. A cl
 - Per-hop observation logs + a checker for the anonymity claims
 - Latency comparison for 1 to 5 hops
 - Streamlit dashboard to tweak hops, delay, packet loss and crashes and watch the effect
+- Animated step-by-step player: relays drift into a circuit, keys appear as rings around the source, the onion packet loses a layer at every hop; full event log with the current step highlighted
 
 ## Files
 
@@ -26,8 +27,11 @@ A small Tor-style onion routing overlay for the Distributed Systems course. A cl
 | `src/experiment.py` | starts a whole network inside one process, runs requests, latency sweep |
 | `src/analysis.py` | "what did each hop see" + anonymity claim checks |
 | `src/dashboard.py` | Streamlit dashboard |
+| `src/player.html` | Streamlit wrapper that inlines the shared player from `site/` |
 | `tests/test_onion.py` | pytest tests |
-| `site/` | static browser version of the dashboard (JS port of the same protocol, deployed on GitHub Pages) |
+| `site/sim.js` | JS port of the protocol for the browser version (real WebCrypto, simulated network) |
+| `site/scene.js`, `site/player.js`, `site/player.css` | the step-by-step player, shared by the Pages site and the Streamlit dashboard |
+| `site/index.html`, `site/app.js`, `site/style.css` | the Pages version of the dashboard (same sidebar and tabs as Streamlit) |
 
 ## How to use
 
@@ -47,7 +51,7 @@ A small Tor-style onion routing overlay for the Distributed Systems course. A cl
    ```
    Every component writes what it observed to `logs/<name>.jsonl`. Kill a relay (Ctrl+C) between client runs, or while it is running, to see the circuit rebuild.
 
-The Pages dashboard cannot open TCP sockets, so `site/sim.js` re-implements the protocol in the browser: real WebCrypto ECDH, HKDF and AES-GCM layers, but the network (delay, loss, crashes) is simulated with a virtual clock. The Streamlit dashboard runs the actual Python relays.
+The Pages dashboard cannot open TCP sockets, so `site/sim.js` re-implements the protocol in the browser: real WebCrypto ECDH, HKDF and AES-GCM layers, but the network (delay, loss, crashes) is simulated with a virtual clock. The Streamlit dashboard runs the actual Python relays. Both feed their event log to the same player (`site/scene.js` + `site/player.js`), so they draw the same picture.
 
 ## How it works (short version)
 
@@ -67,8 +71,4 @@ The Pages dashboard cannot open TCP sockets, so `site/sim.js` re-implements the 
 
 ## Technologies used
 
-Python 3 asyncio, `cryptography` (X25519, HKDF, AES-GCM), Streamlit, pandas, matplotlib, pytest.
-
-## Credits
-
-Team 23, IIIT Hyderabad, Distributed Systems course project.
+Python 3 asyncio, `cryptography` (X25519, HKDF, AES-GCM), Streamlit, pandas, matplotlib, pytest. Vanilla JS + SVG for the player and the Pages site.

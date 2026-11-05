@@ -14,7 +14,7 @@ const Sim = (() => {
     const dec = new TextDecoder();
 
     const DEFAULT_CONFIG = {
-        hops: 3, relays: 6, delayMs: 10, lossPct: 0, requests: 6, timeoutMs: 500,
+        hops: 3, relays: 5, delayMs: 20, lossPct: 0, requests: 2, timeoutMs: 500,
         killAt: null, killHop: 1, retry: true, heartbeat: false,
     };
 
@@ -154,8 +154,9 @@ const Sim = (() => {
             log(w, relay.name, "extend", { prev: lastHop.prevAddr, next: target.name });
             const targetRelay = w.relays.find(r => r.name === target.name);
             if (targetRelay.alive) {
-                log(w, relay.name, "linked", { localAddr: target.prevAddr, next: target.name });
+                // Same order as the Python relays: the new relay does its key exchange, then the link is reported open
                 log(w, target.name, "create", { prev: target.prevAddr });
+                log(w, relay.name, "linked", { localAddr: target.prevAddr, next: target.name });
                 replyCmd = EXTENDED;
                 replyData = new Uint8Array(0);
             } else {

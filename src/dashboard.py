@@ -2,8 +2,10 @@
 # Run with:  streamlit run src/dashboard.py
 
 # Importing Modules
-import math
+import re
+import json
 import asyncio
+from pathlib import Path
 
 import streamlit as st
 import pandas as pd
@@ -14,36 +16,64 @@ import experiment
 import analysis
 
 # Defining Constants
-BLUE = "#2a6fdb"        # active circuit
-GREY = "#b8bcc4"        # idle relays
-RED = "#d6453d"         # dead relays / failures
-GREEN = "#2f9e5b"       # success
-CLIENT_POS = (0.0, 0.5)
-DEST_POS = (1.0, 0.5)
+BLUE = "#2a6fdb"        # charts: request latency
+RED = "#d6453d"         # charts: failures / build time
+GREEN = "#2f9e5b"       # charts: success
+SITE_DIR = Path(__file__).resolve().parent.parent / "site"     # the player is shared with the Pages site
+PLAYER_TEMPLATE = Path(__file__).with_name("player.html")
+PLAYER_HEIGHT = 1030
+MAX_EASY_STEPS = 30     # above this many log events a run gets hard to follow
+PLAYER_FIELDS = ("kind", "who", "names", "path", "cmd", "inSize", "outSize", "payload",
+                 "name", "attempt", "detail", "dead", "buildMs", "latencyMs")     # all the player reads (no addresses)
 
 
 # Defining Functions
-def relayPositions(names):
+def circuitState(events, step):
     """
-    Place the relay pool on a circle between the client (left) and destination (right).
+    Replay the log up to `step`: relays picked, hops with an agreed key (path), the hop whose
+    key exchange is still going on (pending), crashed relays and whether the circuit is ready.
     """
-    positions = {}
-    for i in range(len(names)):
-        angle = 2 * math.pi * i / len(names) + math.pi / 2
-        positions[names[i]] = (0.5 + 0.28 * math.cos(angle), 0.5 + 0.38 * math.sin(angle))
-    positions["client"] = CLIENT_POS
-    positions["destination"] = DEST_POS
-    return positions
+    state = {"chosen": [], "path": [], "pending": None, "dead": [], "ready": False}
+    for e in events[:step + 1]:
+        kind = e["kind"]
+        if kind == "build":
+            state["chosen"] = e["names"]
+            state["path"] = []
+            state["pending"] = None
+            state["ready"] = False
+        elif kind == "create":
+            state["pending"] = e["who"]
+        elif kind == "hop_added":
+            state["path"] = e["path"]
+            state["pending"] = None
+        elif kind == "circuit_ready":
+            state["ready"] = True
+        elif kind == "killed":
+            state["dead"].append(e["name"])
+    return state
 
 
-def describe(e):
+def cleanText(text):
     """
-    Turn one log event into a short plain-English sentence.
+    Helper function: no IPs or ports in anything the user reads, relays are only ever R1, R2, ...
     """
+    return re.sub(r"127\.0\.0\.1:\d+", "a relay", str(text))
+
+
+def describe(events, step):
+    """
+    Turn one log event into a short plain-English sentence (relay names only, never addresses).
+    """
+    e = events[step]
     who = e["who"]
     kind = e["kind"]
+    before = circuitState(events, step - 1)
+    after = circuitState(events, step)
+    nextIndex = len(after["path"])
+    nextName = after["chosen"][nextIndex] if nextIndex < len(after["chosen"]) else "the next relay"
+
     if kind == "build":
-        return f"Client picked relays {e['names']} from the directory"
+        return f"Client picked {', '.join(e['names'])} from the directory"
     if kind == "hop_added":
         return f"Circuit extended: client -> {' -> '.join(e['path'])}"
     if kind == "circuit_ready":
@@ -51,35 +81,38 @@ def describe(e):
     if kind == "wrap":
         return f"Client wrapped {e['cmd']} in {len(e['layers'])} encryption layer(s)"
     if kind == "create":
-        return f"{who} did a key exchange with {e['prev']}"
+        if len(before["path"]) == 0:
+            return f"{who} did a key exchange with the client"
+        return f"{who} did a key exchange with the client, relayed through {before['path'][-1]}"
     if kind == "extend":
-        return f"{who} was told to extend to {e['next']}"
+        return f"{who} was told to extend the circuit to {nextName}"
     if kind == "linked":
-        return f"{who} opened a link to {e['next']}"
+        return f"{who} opened a link to {nextName}"
     if kind == "peel":
         return f"{who} peeled its layer ({e['inSize']} -> {e['outSize']} bytes) and forwarded it"
     if kind == "exit":
-        return f"{who} (exit) sends '{e['payload']}' to {e['dest']}"
+        return f"{who} (exit) sends '{e['payload']}' to the destination"
     if kind == "ping":
         return f"{who} (last hop) answered a heartbeat ping"
     if kind == "drop":
         return f"{who} dropped a cell (packet loss)"
     if kind == "error":
-        return f"{who} rejected a cell: {e['detail']}"
+        return f"{who} rejected a cell: {cleanText(e['detail'])}"
     if kind == "request":
-        return f"Destination got '{e['payload']}' from {e['prev']} (the exit relay)"
+        exitName = after["path"][-1] if after["path"] else "the exit relay"
+        return f"Destination got '{e['payload']}' from {exitName} (the exit relay)"
     if kind == "response":
         return f"Client received the reply in {e['latencyMs']:.0f} ms"
     if kind == "killed":
         return f"{e['name']} CRASHED"
     if kind == "request_failed":
-        return f"Request attempt {e['attempt']} failed: {e['detail']}"
+        return f"Request attempt {e['attempt']} failed: {cleanText(e['detail'])}"
     if kind == "rebuild_start":
         return "Client is rebuilding the circuit"
     if kind == "dead_found":
-        return f"Client found dead relays: {e['dead']}"
+        return f"Client found dead relays: {', '.join(e['dead']) if e['dead'] else 'none'}"
     if kind == "build_failed":
-        return f"Circuit build failed: {e['detail']}"
+        return f"Circuit build failed: {cleanText(e['detail'])}"
     if kind == "heartbeat_failed":
         return "Heartbeat failed, rebuilding"
     if kind == "giving_up":
@@ -87,63 +120,41 @@ def describe(e):
     return kind
 
 
-def stateAtStep(events, step):
+def playerEvents(run):
     """
-    Replay the log up to `step` to know the current circuit path and which relays are dead.
-    """
-    path = []
-    dead = []
-    for e in events[:step + 1]:
-        if e["who"] == "client" and "path" in e:
-            path = e["path"]
-        if e["kind"] == "killed":
-            dead.append(e["name"])
-    return path, dead
-
-
-def drawNetwork(run, step):
-    """
-    Draw the relay pool, the current circuit and the node that just did something.
+    Input  : one finished run
+    Output : its events with only the fields the player reads (no IPs or ports), t in ms from the start
     """
     events = run["events"]
-    names = run["relayNames"]
-    positions = relayPositions(names)
-    path, dead = stateAtStep(events, step)
-    active = events[step]["who"]
+    start = events[0]["t"]
+    slim = []
+    for e in events:
+        item = {"t": round((e["t"] - start) * 1000, 1)}
+        for field in PLAYER_FIELDS:
+            if field in e:
+                item[field] = e[field]
+        if "layers" in e:
+            item["layers"] = [{"hop": layer["hop"]} for layer in e["layers"]]
+        if "detail" in item:
+            item["detail"] = cleanText(item["detail"])
+        slim.append(item)
+    return slim
 
-    fig, ax = plt.subplots(figsize=(8, 4.4))
-    fig.patch.set_facecolor("white")
 
-    # Circuit edges
-    chain = ["client"] + path
-    if len(path) > 0:
-        chain.append("destination")
-    for i in range(len(chain) - 1):
-        a = positions[chain[i]]
-        b = positions[chain[i + 1]]
-        ax.annotate("", xy=b, xytext=a, arrowprops=dict(arrowstyle="->", color=BLUE, lw=2, shrinkA=14, shrinkB=14))
-
-    # Nodes
-    for name in positions:
-        x, y = positions[name]
-        color = GREY
-        if name in path or name == "client" or name == "destination":
-            color = BLUE
-        if name in dead:
-            color = RED
-        size = 900 if name == active else 500
-        ax.scatter([x], [y], s=size, color=color, zorder=3, edgecolors="black" if name == active else "none", linewidths=2)
-        label = name
-        if name in path:
-            label = f"{name}\nhop {path.index(name) + 1}"
-        ax.text(x, y - 0.09, label, ha="center", va="top", fontsize=8, color="#222")
-        if name in dead:
-            ax.text(x, y, "X", ha="center", va="center", color="white", fontsize=10, fontweight="bold", zorder=4)
-
-    ax.set_xlim(-0.1, 1.1)
-    ax.set_ylim(0.0, 1.05)
-    ax.axis("off")
-    return fig
+def buildPlayerHtml(run):
+    """
+    Input  : one finished run
+    Output : a self-contained page with the shared player (site/scene.js + site/player.js) and this run's events.
+             The browser precomputes every step, so playing needs no server round trips.
+    """
+    html = PLAYER_TEMPLATE.read_text()
+    html = html.replace("__CSS__", (SITE_DIR / "player.css").read_text())
+    html = html.replace("__SCENE__", (SITE_DIR / "scene.js").read_text())
+    html = html.replace("__PLAYER__", (SITE_DIR / "player.js").read_text())
+    html = html.replace("__EVENTS__", json.dumps(playerEvents(run)).replace("</", "<\\/"))
+    html = html.replace("__RELAYS__", json.dumps(run["relayNames"]))
+    html = html.replace("__HOPS__", str(run["config"]["hops"]))
+    return html
 
 
 def runAsync(coroutine):
@@ -153,69 +164,68 @@ def runAsync(coroutine):
     return asyncio.run(coroutine)
 
 
+def whoLabel(who):
+    """
+    Helper function: 'client' -> 'Client', relays stay R1, R2, ...
+    """
+    return who.capitalize() if who in ("client", "destination", "experiment") else who
+
+
 # Page setup
 st.set_page_config(page_title="Onion Routing Lab", layout="wide")
 st.title("Onion Routing Lab")
 st.caption("Real relays, a real directory and a real client, all running as asyncio servers on localhost. Change a setting and hit Run.")
 
-# Sidebar : the knobs
+# Sidebar : the basic knobs (defaults give a run of under 30 steps)
 st.sidebar.header("Network settings")
 hops = st.sidebar.slider("Hops in the circuit", 1, 5, 3)
-poolSize = st.sidebar.slider("Relays in the pool", 3, 10, 6)
-delayMs = st.sidebar.slider("Delay per link (ms)", 0, 100, 10)
-lossPct = st.sidebar.slider("Packet loss per relay (%)", 0, 30, 0)
-requests = st.sidebar.slider("Requests to send", 1, 20, 6)
-timeoutMs = st.sidebar.slider("Client timeout (ms)", 100, 2000, 500, step=50)
+poolSize = st.sidebar.slider("Relays in the pool", 3, 10, 5)
+requests = st.sidebar.slider("Requests to send", 1, 6, 2)
+delayMs = st.sidebar.slider("Delay per link (ms)", 0, 100, 20)
 
-st.sidebar.header("Failure injection")
-killOn = st.sidebar.checkbox("Crash a relay mid-run", value=True)
-killAt = st.sidebar.slider("...before request #", 0, max(requests - 1, 0), min(2, requests - 1))
-killHop = st.sidebar.slider("...which hop dies (1 = entry)", 1, hops, min(2, hops))
-retry = st.sidebar.radio("In-flight request policy", ["Retry once on a new circuit", "Fail with an error"]) == "Retry once on a new circuit"
-heartbeat = st.sidebar.checkbox("Heartbeat (detect failure before next request)", value=False)
+# Sidebar : advanced knobs, closed by default
+with st.sidebar.expander("Advanced settings", expanded=False):
+    lossPct = st.slider("Packet loss per relay (%)", 0, 30, 0)
+    timeoutMs = st.slider("Client timeout (ms)", 100, 2000, 500, step=50)
 
-if poolSize < hops + 1:
+    st.markdown("**Failure injection**")
+    killOn = st.checkbox("Crash a relay mid-run", value=False)
+    killAt = st.selectbox("...before request #", list(range(requests)), index=min(1, requests - 1))
+    killHop = st.selectbox("...which hop dies (1 = entry)", list(range(1, hops + 1)), index=min(1, hops - 1))
+    retry = st.radio("In-flight request policy", ["Retry once on a new circuit", "Fail with an error"]) == "Retry once on a new circuit"
+    heartbeat = st.checkbox("Heartbeat (detect failure before next request)", value=False)
+
+if killOn and poolSize < hops + 1:
     st.sidebar.warning("Pool is smaller than hops + 1, a failed relay cannot be replaced.")
 
 config = {"hops": hops, "relays": poolSize, "delayMs": delayMs, "lossPct": lossPct, "requests": requests,
           "timeoutMs": timeoutMs, "killAt": killAt if killOn else None, "killHop": killHop - 1,
           "retry": retry, "heartbeat": heartbeat}
 
+# Run : do the experiment, then build the browser player for it (it starts playing by itself)
 if st.sidebar.button("Run", type="primary", width="stretch") or "run" not in st.session_state:
-    st.session_state["run"] = runAsync(experiment.runExperiment(config))
+    with st.spinner("Starting relays and sending requests..."):
+        st.session_state["run"] = runAsync(experiment.runExperiment(config))
     st.session_state["config"] = config
+    st.session_state["playerHtml"] = buildPlayerHtml(st.session_state["run"])
 
 run = st.session_state["run"]
 events = run["events"]
 results = run["results"]
 
-# Headline numbers
-okResults = [r for r in results if r["ok"]]
-meanLatency = sum(r["latencyMs"] for r in okResults) / len(okResults) if okResults else 0
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Succeeded", f"{len(okResults)} / {len(results)}")
-col2.metric("Mean latency", f"{meanLatency:.0f} ms")
-col3.metric("Circuit build", f"{run['buildMs']:.0f} ms" if run["buildMs"] else "-")
-col4.metric("Retried requests", sum(1 for r in results if r["attempts"] > 1))
+# Telling the user how long the story is
+if len(events) > MAX_EASY_STEPS:
+    st.sidebar.warning(f"This run has {len(events)} steps. Lower the hops or requests to keep it easy to follow.")
+else:
+    st.sidebar.caption(f"This run has {len(events)} steps.")
 
 tabFlow, tabLayers, tabLatency, tabFail, tabSaw = st.tabs(
     ["Message flow", "Layered encryption", "Latency vs hops", "Failures", "What each hop saw"])
 
 # Tab 1 : step through the log
 with tabFlow:
-    st.write("Scrub through everything that happened, one log event at a time.")
-    step = st.slider("Step", 0, len(events) - 1, 0)
-    left, right = st.columns([3, 2])
-    with left:
-        st.pyplot(drawNetwork(run, step))
-    with right:
-        st.subheader(f"Step {step}")
-        st.info(describe(events[step]))
-        start = events[0]["t"]
-        rows = []
-        for i in range(max(0, step - 9), step + 1):
-            rows.append({"t (ms)": round((events[i]["t"] - start) * 1000), "who": events[i]["who"], "what": describe(events[i])})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+    st.write("Press Run in the sidebar and watch it play, one log event at a time. Pause any time, drag the slider or step with the buttons.")
+    st.iframe(st.session_state["playerHtml"], height=PLAYER_HEIGHT)
 
 # Tab 2 : what the layers look like
 with tabLayers:
@@ -304,9 +314,10 @@ with tabFail:
     st.subheader("Failure timeline")
     start = events[0]["t"]
     timeline = []
-    for e in events:
+    for i in range(len(events)):
+        e = events[i]
         if e["kind"] in ("killed", "request_failed", "rebuild_start", "dead_found", "build_failed", "heartbeat_failed", "circuit_ready", "giving_up", "drop"):
-            timeline.append({"t (ms)": round((e["t"] - start) * 1000), "who": e["who"], "what": describe(e)})
+            timeline.append({"t (ms)": round((e["t"] - start) * 1000), "who": whoLabel(e["who"]), "what": describe(events, i)})
     st.dataframe(pd.DataFrame(timeline), hide_index=True, width="stretch")
 
 # Tab 5 : observability
@@ -320,7 +331,7 @@ with tabSaw:
     if firstCircuit is None:
         st.warning("No complete circuit was built.")
     else:
-        st.write(f"Circuit: client ({firstCircuit['clientAddr']}) -> {' -> '.join(firstCircuit['path'])} -> destination ({run['destAddr']})")
+        st.write(f"Circuit: client -> {' -> '.join(firstCircuit['path'])} -> destination")
         rows = analysis.whatEachHopSaw(events, firstCircuit["path"], firstCircuit["clientAddr"])
         table = pd.DataFrame(rows).rename(columns={"knowsClient": "knows client address", "knowsNextHop": "knows next hop",
                                                    "knowsDestination": "knows destination", "seesPlaintext": "sees plaintext"})

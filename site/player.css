@@ -1,0 +1,46 @@
+/* Step-by-step onion player. Everything is scoped under .op-player so it can sit inside any page. */
+.op-player { background: #0c0e16; color: #e8eaf2; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+             padding: 10px 12px 14px; border-radius: 10px; box-sizing: border-box; }
+.op-player * { box-sizing: border-box; }
+
+/* Controls */
+.op-player .op-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.op-player button { background: #1e2333; color: #e8eaf2; border: 1px solid #2b3145; border-radius: 8px; padding: 7px 14px;
+                    font-size: 0.9rem; cursor: pointer; font-family: inherit; line-height: 1.2; }
+.op-player button:hover { background: #272d42; }
+.op-player button.op-primary { background: linear-gradient(135deg, #7c5cff, #5b95f0); border: 0; color: #fff; font-weight: 600; min-width: 78px; }
+.op-player select { background: #1e2333; color: #e8eaf2; border: 1px solid #2b3145; border-radius: 8px; padding: 6px 8px; font-family: inherit; }
+.op-player input[type=range] { flex: 1; min-width: 60px; accent-color: #7c5cff; }
+.op-player .op-count { color: #98a1b8; font-size: 0.82rem; min-width: 5.5em; text-align: right; }
+
+/* Stage */
+.op-player .op-stage { width: 100%; height: auto; max-height: 470px; display: block; background: #0c0e16; border: 1px solid #1d2233; border-radius: 12px; }
+.op-player .op-stage text { font-family: inherit; }
+.op-player .op-march { animation: op-march 1.1s linear infinite; }
+@keyframes op-march { to { stroke-dashoffset: -0.6; } }
+.op-player circle, .op-player path, .op-player polygon, .op-player text { transition: stroke 0.5s, fill 0.5s, filter 0.5s; }
+.op-player .op-legend { color: #98a1b8; font-size: 0.74rem; margin: 6px 2px 8px; line-height: 1.5; }
+
+/* Current step */
+.op-player .op-detail { display: grid; grid-template-columns: 1fr 150px; gap: 12px; align-items: center; }
+.op-player .op-card { background: #171b28; border: 1px solid #2b3145; border-left: 4px solid #7c5cff; border-radius: 10px; padding: 10px 14px; min-height: 96px; }
+.op-player .op-card.op-bad { border-left-color: #ff4d4d; }
+.op-player .op-meta { color: #98a1b8; font-size: 0.78rem; margin-bottom: 3px; }
+.op-player .op-text { font-size: 1.08rem; font-weight: 650; margin-bottom: 4px; }
+.op-player .op-why { color: #98a1b8; font-size: 0.88rem; }
+.op-player .op-section { width: 150px; height: 150px; }
+
+/* Full log */
+.op-player .op-logtitle { color: #98a1b8; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 14px 2px 6px; }
+.op-player .op-log { position: relative; height: 230px; overflow-y: auto; border: 1px solid #2b3145; border-radius: 8px; }
+.op-player table { border-collapse: collapse; width: 100%; font-size: 0.8rem; }
+.op-player td, .op-player th { text-align: left; padding: 4px 10px; border-bottom: 1px solid #1d2233; color: inherit; }
+.op-player th { color: #98a1b8; position: sticky; top: 0; background: #12151f; font-weight: 600; }
+.op-player tr.op-now td { background: #ffe08a; color: #111; font-weight: 700; }
+.op-player tbody tr { cursor: pointer; }
+
+@media (max-width: 640px) {
+    .op-player .op-bar { flex-wrap: wrap; }
+    .op-player .op-detail { grid-template-columns: 1fr; }
+    .op-player .op-section { justify-self: center; }
+}
