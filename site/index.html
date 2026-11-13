@@ -5,13 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Onion Routing Lab</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="player.css">
 </head>
 <body>
     <!-- Sidebar : same knobs as the Streamlit dashboard -->
     <aside id="sidebar">
+        <figure class="onion" aria-live="polite">
+            <svg id="rings" viewBox="0 0 120 120" role="img" aria-label="Concentric rings, one per hop"></svg>
+            <figcaption id="ringsCaption"></figcaption>
+        </figure>
         <h2>Network settings</h2>
         <div class="slider" data-id="hops" data-label="Hops in the circuit" data-min="1" data-max="5" data-value="3"></div>
         <div class="slider" data-id="pool" data-label="Relays in the pool" data-min="3" data-max="10" data-value="5"></div>
@@ -42,47 +47,49 @@
         <div id="stepCount"></div>
     </aside>
 
-    <!-- Main page -->
+    <!-- Main page: one scroll, in the order the story happens -->
     <main>
-        <h1>Onion Routing Lab</h1>
-        <p class="caption">Browser version of the Python lab: real key exchange and AES-GCM layers (WebCrypto), network simulated in your browser. Change a setting and hit Run.</p>
+        <header class="masthead">
+            <h1>Onion Routing Lab</h1>
+            <p class="caption">A message crosses several relays, and each relay can only peel one layer. The keys and AES-GCM layers are real (WebCrypto); the network runs in your browser. Change a setting and press Run.</p>
+        </header>
 
-        <nav class="tabs" id="tabs">
-            <button data-tab="flow" class="active">Message flow</button>
-            <button data-tab="layers">Layered encryption</button>
-            <button data-tab="latency">Latency vs hops</button>
-            <button data-tab="fail">Failures</button>
-            <button data-tab="saw">What each hop saw</button>
+        <nav class="toc" aria-label="Sections">
+            <a href="#flow">Watch it</a>
+            <a href="#layers">Layers</a>
+            <a href="#saw">What each relay saw</a>
+            <a href="#fail">Failures</a>
+            <a href="#latency">Latency</a>
         </nav>
 
-        <!-- Tab 1 : step through the log -->
-        <section id="tab-flow" class="tab">
-            <p>Press Run in the sidebar and watch it play, one log event at a time. Pause any time, drag the slider or step with the buttons.</p>
+        <section id="flow">
+            <h2>1. Watch a request cross the circuit</h2>
+            <p>Plays one log event at a time. Pause, drag the slider or step with the buttons.</p>
             <div id="player"></div>
         </section>
 
-        <!-- Tab 2 : what the layers look like -->
-        <section id="tab-layers" class="tab" hidden>
-            <p>Follow the first request. The client wraps it once per hop; each relay peels exactly one layer. Every cell on the wire is padded to 1024 bytes, so size does not give away the position.</p>
+        <section id="layers">
+            <h2>2. Peeling the layers</h2>
+            <p>The client wraps the first request once per hop and each relay peels exactly one layer. Every cell on the wire is padded to 1024 bytes, so size does not give away the position.</p>
             <div id="layersOut"></div>
         </section>
 
-        <!-- Tab 3 : latency sweep -->
-        <section id="tab-latency" class="tab" hidden>
-            <p>Runs a fresh network for 1 to 5 hops using the current delay / loss settings (no crashes).</p>
-            <button id="sweep">Run latency sweep</button>
-            <div id="sweepOut"></div>
+        <section id="saw">
+            <h2>3. What each relay saw</h2>
+            <div id="sawOut"></div>
         </section>
 
-        <!-- Tab 4 : failures -->
-        <section id="tab-fail" class="tab" hidden>
-            <p>Latency of every request in the main run. Red = failed, orange = recovered by rebuilding the circuit.</p>
+        <section id="fail">
+            <h2>4. When a relay fails</h2>
+            <p>Latency of every request in this run. Red = failed, orange = recovered by rebuilding the circuit.</p>
             <div id="failOut"></div>
         </section>
 
-        <!-- Tab 5 : observability -->
-        <section id="tab-saw" class="tab" hidden>
-            <div id="sawOut"></div>
+        <section id="latency">
+            <h2>5. Latency against hops</h2>
+            <p>Runs a fresh network for 1 to 5 hops with the current delay and loss settings (no crashes).</p>
+            <button id="sweep">Run latency sweep</button>
+            <div id="sweepOut"></div>
         </section>
     </main>
 

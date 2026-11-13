@@ -1,15 +1,18 @@
-/* Page chrome made to look like the Streamlit dashboard (light theme, red accents) */
+/* Page chrome: tracing-paper light theme, one typeface, violet taken from the player.
+   Variable names are kept from the old stylesheet because app.js draws the charts with them. */
 :root {
-    --bg: #ffffff;
-    --sidebar: #f0f2f6;
-    --text: #31333f;
-    --muted: #808495;
-    --line: #e6e9ef;
-    --accent: #ff4b4b;
-    --blue: #2a6fdb;
-    --red: #d6453d;
-    --green: #2f9e5b;
-    --orange: #e08a1e;
+    --bg: #eef1f4;
+    --sidebar: #e0e5ec;
+    --text: #172033;
+    --muted: #55607a;
+    --line: rgba(23, 32, 51, 0.14);
+    --accent: #5b3fd9;
+    --accent-soft: rgba(91, 63, 217, 0.12);
+    --blue: #2563c9;
+    --red: #c8372d;
+    --green: #23824f;
+    --orange: #d9780f;
+    --field: #f8f9fb;
 }
 
 * { box-sizing: border-box; }
@@ -20,91 +23,116 @@ body {
     min-height: 100vh;
     background: var(--bg);
     color: var(--text);
-    font-family: "Source Sans 3", "Source Sans Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
     font-size: 16px;
-    line-height: 1.6;
+    line-height: 1.55;
 }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Sidebar ---------- */
 #sidebar {
-    width: 300px;
+    width: 304px;
     flex-shrink: 0;
     background: var(--sidebar);
-    padding: 3.2rem 1.5rem 2rem;
+    border-right: 1px solid var(--line);
+    padding: 2rem 1.5rem 2rem;
     position: sticky;
     top: 0;
     height: 100vh;
     overflow-y: auto;
 }
-#sidebar h2 { font-size: 1.5rem; font-weight: 600; margin: 0 0 1rem; }
-.bold { font-weight: 700; margin: 0.8rem 0 0.3rem; }
+#sidebar h2 { font-size: 1.15rem; font-weight: 700; margin: 0 0 1.2rem; }
+.bold { font-weight: 700; margin: 1rem 0 0.3rem; font-size: 0.9rem; }
 
-/* Slider with the value floating above the thumb, like st.slider */
-.slider { margin: 0 0 1.1rem; font-size: 0.875rem; }
+/* The onion: the one memorable thing on the page */
+.onion { margin: 0 0 1.6rem; text-align: center; }
+.onion svg { width: 148px; height: 148px; display: block; margin: 0 auto 0.4rem; }
+.onion .ring { fill: none; stroke: var(--text); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.22;
+               transition: stroke 0.35s, opacity 0.35s, stroke-width 0.35s; }
+.onion .ring.on { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; opacity: 1; }
+.onion .core { fill: var(--text); }
+.onion figcaption { font-size: 0.85rem; color: var(--muted); }
+
+/* Sliders: value floats above the thumb */
+.slider { margin: 0 0 1.1rem; font-size: 0.9rem; }
 .slider .lbl { display: block; margin-bottom: 1.5rem; }
 .slider .track { position: relative; }
-.slider .val { position: absolute; top: -1.45rem; transform: translateX(-50%); color: var(--accent); font-size: 0.8rem; white-space: nowrap; }
+.slider .val { position: absolute; top: -1.45rem; transform: translateX(-50%); color: var(--accent); font-weight: 700; font-size: 0.85rem; white-space: nowrap; }
 .slider input { width: 100%; accent-color: var(--accent); margin: 0; }
 
-/* Expander */
-.expander { border: 1px solid #d5d8e0; border-radius: 0.5rem; margin: 0.6rem 0 1rem; background: var(--sidebar); }
-.expander summary { cursor: pointer; padding: 0.6rem 0.9rem; font-size: 0.95rem; list-style: none; }
+/* Advanced settings */
+.expander { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0.6rem 0 1.2rem; }
+.expander summary { cursor: pointer; padding: 0.7rem 0; font-size: 0.95rem; font-weight: 600; list-style: none; }
 .expander summary::before { content: "\203A"; display: inline-block; width: 1.1rem; font-weight: 700; transition: transform 0.2s; }
 .expander[open] summary::before { transform: rotate(90deg); }
 .expander summary::-webkit-details-marker { display: none; }
-.expander-body { padding: 0.2rem 0.9rem 0.9rem; }
-label.check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.875rem; margin: 0.35rem 0; cursor: pointer; }
+.expander-body { padding: 0.2rem 0 0.9rem; }
+label.check { display: flex; gap: 0.5rem; align-items: center; font-size: 0.9rem; margin: 0.4rem 0; cursor: pointer; }
 label.check input { accent-color: var(--accent); }
-.field { display: block; font-size: 0.875rem; margin: 0.6rem 0; }
-.field select { display: block; width: 100%; margin-top: 0.3rem; padding: 0.45rem 0.6rem; border: 1px solid #d5d8e0; border-radius: 0.5rem;
-                background: #fff; font-family: inherit; font-size: 0.9rem; color: var(--text); }
+.field { display: block; font-size: 0.9rem; margin: 0.7rem 0; }
+.field select { display: block; width: 100%; margin-top: 0.3rem; padding: 0.45rem 0.6rem; border: 1px solid var(--line); border-radius: 4px;
+                background: var(--field); font-family: inherit; font-size: 0.9rem; color: var(--text); }
 
 /* Buttons */
 button { font-family: inherit; }
 main button, #sidebar button {
-    background: #fff; color: var(--text); border: 1px solid #d5d8e0; border-radius: 0.5rem;
-    padding: 0.4rem 0.9rem; font-size: 0.95rem; cursor: pointer;
+    background: var(--field); color: var(--text); border: 1px solid rgba(23, 32, 51, 0.3); border-radius: 4px;
+    padding: 0.45rem 1rem; font-size: 0.95rem; font-weight: 600; cursor: pointer;
 }
 main button:hover, #sidebar button:hover { border-color: var(--accent); color: var(--accent); }
 #sidebar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-#sidebar button.primary:hover { filter: brightness(0.95); color: #fff; }
-#sidebar button.wide { width: 100%; padding: 0.55rem; margin-top: 0.4rem; }
+#sidebar button.primary:hover { background: #4a30c0; color: #fff; }
+#sidebar button.wide { width: 100%; padding: 0.65rem; margin-top: 0.4rem; font-size: 1rem; }
 button:disabled { opacity: 0.6; cursor: progress; }
 #stepCount { margin-top: 0.8rem; }
-.caption, .stcaption { color: var(--muted); font-size: 0.875rem; }
+.caption, .stcaption { color: var(--muted); font-size: 0.9rem; }
 
-/* Alert boxes like st.warning / st.success / st.error */
-.alert { border-radius: 0.5rem; padding: 0.8rem 1rem; font-size: 0.9rem; margin: 0.6rem 0; }
-.alert.warning { background: #fffce7; color: #926c05; }
-.alert.success { background: #dff6e7; color: #177233; }
-.alert.error { background: #ffe9e9; color: #7d353b; }
+/* Messages */
+.alert { border-left: 4px solid; border-radius: 4px; padding: 0.7rem 1rem; font-size: 0.92rem; margin: 0.6rem 0; }
+.alert.warning { background: #fbf0d6; border-color: #c28a12; color: #6b4b05; }
+.alert.success { background: #dcf0e4; border-color: var(--green); color: #14502e; }
+.alert.error { background: #f9e0dd; border-color: var(--red); color: #7a1f18; }
 
 /* ---------- Main ---------- */
-main { flex: 1; min-width: 0; padding: 4.5rem 3rem 4rem; max-width: 1240px; }
-h1 { font-size: 2.75rem; font-weight: 700; margin: 0 0 0.4rem; line-height: 1.2; }
-h3 { font-size: 1.5rem; font-weight: 600; margin: 1.6rem 0 0.6rem; }
+main { flex: 1; min-width: 0; padding: 2.8rem 3rem 4rem; max-width: 1180px; }
+h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -0.035em; margin: 0 0 0.5rem; line-height: 1; }
+h3 { font-size: 1.2rem; font-weight: 700; margin: 1.8rem 0 0.6rem; }
+main p { max-width: 68ch; }
 
-.tabs { display: flex; gap: 1.2rem; border-bottom: 2px solid var(--line); margin: 1.2rem 0 1rem; overflow-x: auto; overflow-y: hidden; }
-.tabs button { background: none !important; border: 0 !important; border-radius: 0 !important; padding: 0.5rem 0 !important; color: var(--text) !important;
-               font-size: 0.95rem; white-space: nowrap; margin-bottom: -2px; border-bottom: 2px solid transparent !important; }
-.tabs button.active { color: var(--accent) !important; border-bottom-color: var(--accent) !important; }
+.masthead { margin-bottom: 1.2rem; }
+.toc { display: flex; gap: 1.6rem; position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--line);
+       padding: 0.6rem 0; overflow-x: auto; }
+.toc a { color: var(--muted); font-weight: 600; font-size: 0.95rem; text-decoration: none; white-space: nowrap; }
+.toc a:hover { color: var(--accent); }
+main section { padding-top: 2.6rem; margin-top: -0.4rem; scroll-margin-top: 2.5rem; }
+main h2 { font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 0.5rem; }
+html { scroll-behavior: smooth; }
 
-/* Tables like st.dataframe */
-.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 0.5rem; margin: 0.4rem 0 0.6rem; }
-table.df { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
-table.df th { background: #f8f9fb; color: var(--muted); font-weight: 400; text-align: left; padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--line); }
-table.df td { padding: 0.35rem 0.75rem; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
-table.df td.num { text-align: right; }
-table.df td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.8rem; }
+/* The player keeps its own look (player.css is shared with the Streamlit dashboard); only the font follows the page */
+#player.op-player { font-family: inherit; }
+
+/* Tables */
+.tablewrap { overflow-x: auto; border-top: 2px solid var(--text); border-bottom: 1px solid var(--line); margin: 0.6rem 0 0.8rem; }
+table.df { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+table.df th { color: var(--muted); font-weight: 600; text-align: left; padding: 0.5rem 0.8rem; border-bottom: 1px solid var(--line); }
+table.df td { padding: 0.45rem 0.8rem; border-bottom: 1px solid var(--line); }
+table.df td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.df td.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.82rem; }
 table.df tr:last-child td { border-bottom: 0; }
 
 .chart { width: 100%; max-width: 760px; display: block; margin: 0.6rem 0; }
 .chart text { font-family: inherit; font-size: 12px; fill: var(--text); }
 
-/* ---------- Small screens: sidebar on top, like Streamlit's collapsed layout ---------- */
+/* ---------- Small screens: settings on top ---------- */
 @media (max-width: 860px) {
     body { display: block; }
-    #sidebar { width: auto; height: auto; position: static; padding: 1.5rem 1rem; }
-    main { padding: 1.5rem 1rem 3rem; }
-    h1 { font-size: 2rem; }
+    #sidebar { width: auto; height: auto; position: static; padding: 1.5rem 1rem; border-right: 0; border-bottom: 1px solid var(--line); }
+    .onion svg { width: 110px; height: 110px; }
+    main { padding: 1.8rem 1rem 3rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
 }

@@ -1,4 +1,4 @@
-// Page logic of the Pages site: same sidebar and tabs as the Streamlit dashboard,
+// Page logic of the Pages site: a settings rail and one scrolling page,
 // with the network simulated by sim.js and the player shared through scene.js + player.js.
 
 // ---------- Small helpers ----------
@@ -105,6 +105,21 @@ function syncSidebar() {
     fillSelect($("killAt"), killAt, Math.min(1, reqs - 1));
     fillSelect($("killHop"), killHop, Math.min(1, hops - 1));
     $("poolWarn").hidden = !($("killOn").checked && +$("pool").value < hops + 1);
+    drawRings(hops);
+}
+
+function drawRings(hops) {
+    // The onion in the sidebar: one ring per hop, outermost = entry relay, dot in the middle = the request
+    const svg = $("rings");
+    if (!svg.firstChild) {
+        let html = "";
+        for (let i = 0; i < 5; i++) {
+            html += '<circle class="ring" cx="60" cy="60" r="' + (52 - i * 9) + '"/>';
+        }
+        svg.innerHTML = html + '<circle class="core" cx="60" cy="60" r="6"/>';
+    }
+    svg.querySelectorAll(".ring").forEach((ring, i) => ring.classList.toggle("on", i < hops));
+    $("ringsCaption").textContent = hops === 1 ? "1 layer, so one relay sees everything" : hops + " layers, one peeled per relay";
 }
 
 function readConfig() {
@@ -141,11 +156,11 @@ function axes(w, h, pad, yMax, xLabel, yLabel) {
     let svg = "";
     for (let v = 0; v <= yMax + 1e-9; v += step) {
         const y = h - pad.b - (v / yMax) * (h - pad.b - pad.t);
-        svg += '<line x1="' + (pad.l - 4) + '" y1="' + y + '" x2="' + pad.l + '" y2="' + y + '" stroke="#31333f"/>';
+        svg += '<line x1="' + (pad.l - 4) + '" y1="' + y + '" x2="' + pad.l + '" y2="' + y + '" stroke="#172033"/>';
         svg += '<text x="' + (pad.l - 7) + '" y="' + (y + 4) + '" text-anchor="end">' + Math.round(v * 10) / 10 + "</text>";
     }
-    svg += '<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (h - pad.b) + '" stroke="#31333f"/>';
-    svg += '<line x1="' + pad.l + '" y1="' + (h - pad.b) + '" x2="' + (w - pad.r) + '" y2="' + (h - pad.b) + '" stroke="#31333f"/>';
+    svg += '<line x1="' + pad.l + '" y1="' + pad.t + '" x2="' + pad.l + '" y2="' + (h - pad.b) + '" stroke="#172033"/>';
+    svg += '<line x1="' + pad.l + '" y1="' + (h - pad.b) + '" x2="' + (w - pad.r) + '" y2="' + (h - pad.b) + '" stroke="#172033"/>';
     svg += '<text x="' + ((pad.l + w - pad.r) / 2) + '" y="' + (h - 6) + '" text-anchor="middle">' + xLabel + "</text>";
     svg += '<text transform="translate(16 ' + ((pad.t + h - pad.b) / 2) + ') rotate(-90)" text-anchor="middle">' + yLabel + "</text>";
     return svg;
@@ -324,19 +339,6 @@ for (const box of document.querySelectorAll(".slider")) {
 $("killOn").addEventListener("change", syncSidebar);
 $("run").addEventListener("click", runClicked);
 $("sweep").addEventListener("click", sweepClicked);
-
-$("tabs").addEventListener("click", e => {
-    const tab = e.target.dataset.tab;
-    if (!tab) {
-        return;
-    }
-    for (const button of document.querySelectorAll("#tabs button")) {
-        button.classList.toggle("active", button === e.target);
-    }
-    for (const section of document.querySelectorAll(".tab")) {
-        section.hidden = section.id !== "tab-" + tab;
-    }
-});
 
 syncSidebar();
 runClicked();

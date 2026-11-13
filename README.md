@@ -31,7 +31,7 @@ A small Tor-style onion routing overlay for the Distributed Systems course. A cl
 | `tests/test_onion.py` | pytest tests |
 | `site/sim.js` | JS port of the protocol for the browser version (real WebCrypto, simulated network) |
 | `site/scene.js`, `site/player.js`, `site/player.css` | the step-by-step player, shared by the Pages site and the Streamlit dashboard |
-| `site/index.html`, `site/app.js`, `site/style.css` | the Pages version of the dashboard (same sidebar and tabs as Streamlit) |
+| `site/index.html`, `site/app.js`, `site/style.css` | the Pages version of the dashboard (a settings rail and one scrolling page) |
 
 ## How to use
 
